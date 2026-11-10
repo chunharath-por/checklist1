@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>MEA 300 บ่อ | Checklist อุปกรณ์</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+
+
+
+  <style>
+    body {
+      font-family: Arial, Tahoma, sans-serif;
+      margin: 20px;
+      color: #222;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 22px;
+    }
+
+    .controls, .job-info {
+      margin-bottom: 16px;
+      padding: 12px;
+      background: #f2f6fa;
+      border-radius: 8px;
+    }
+
+    .job-info {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    input {
+      box-sizing: border-box;
+      padding: 7px;
+      border: 1px solid #aaa;
+      border-radius: 4px;
+    }
+
+    .job-info input {
+      width: 100%;
+    }
+
+    button {
+      padding: 9px 16px;
+      border: none;
+      border-radius: 5px;
+      background: #1565c0;
+      color: white;
+      cursor: pointer;
+      margin-right: 6px;
+    }
+
+    button.pdf {
+      background: #2e7d32;
+    }
+
+    .table-scroll {overflow-x:auto;width:100%;}
+    table {
+      table-layout: fixed;
+      width: 100%;
+      min-width: 1660px;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      border: 1px solid #777;
+      padding: 6px;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+
+    th {
+      background: #1d4e78;
+      color: white;
+      text-align: center;
+    }
+
+    td.number {
+      text-align: center;
+    }
+
+    td input {
+      max-width: 100%;
+      width: 64px;
+      text-align: center;
+    }
+
+    td input.note {
+      width: 100%;
+      text-align: left;
+    }
+
+    .complete {
+      color: #168138;
+      font-weight: bold;
+    }
+
+    .problem {
+      color: #c62828;
+      font-weight: bold;
+    }
+
+    .waiting {
+      color: #d17b00;
+    }
+
+    select {box-sizing:border-box;padding:7px;border:1px solid #aaa;border-radius:4px;background:white;}
+    .job-info select {width:100%;}
+    .vehicle-inputs {display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
+    .vehicle-inputs input {min-width:90px;flex:1 1 90px;}
+    .item-name {display:block;white-space:nowrap;overflow:visible;line-height:1.4;}
+    .note {font-size:12px;}
+    .upload-info {font-size:12px;margin-top:9px;line-height:1.5;}
+    .upload-result {padding:5px 0;font-weight:bold;}
+    .report-title {text-align:center;font-size:22px;}
+    .pdf-render {position:absolute;left:0;top:1800px;z-index:-1;width:1240px;background:white;color:#222;padding:12px;box-sizing:border-box;font-family:Arial,Tahoma,sans-serif;}
+    .pdf-render table {width:100%;min-width:0;table-layout:fixed;font-size:10px;}
+    .pdf-render td,.pdf-render th {white-space:nowrap;}
+    .pdf-render .item-name {font-size:10px;}
+    .pdf-render th,.pdf-render td {padding:6px 4px;border:1px solid #777;}
+    .pdf-render th {background:#1d4e78;color:white;}
+    .pdf-render .remove-col {display:none;}
+    .pdf-render .job-info {grid-template-columns:repeat(2,1fr);}
+    .pdf-render input,.pdf-render select {border:0;background:transparent;}
+    .item-actions { background:#a33; padding:4px 7px; margin:0; }
+    @media print {
+      .item-actions, .remove-col {display:none;}
+      @page {
+        size: A4 landscape;
+        margin: 8mm;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      .controls {
+        display: none;
+      }
+
+      input {
+        border: none;
+        padding: 2px;
+      }
+
+      table {
+        font-size: 9px;
+        min-width: 0;
+      }
+      th,td {white-space:nowrap;}
+      .table-scroll {overflow:visible;}
+
+      th, td {
+        padding: 4px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>แบบฟอร์มตรวจสอบอุปกรณ์ออกหน้างาน</h1>
+
+  <div class="controls">
+    <strong>รายการอุปกรณ์พร้อมใช้งาน</strong>
+    <button class="pdf" id="exportBtn" onclick="exportPdf()">Export PDF</button>
+    <button onclick="window.print()">พิมพ์ผ่านเบราว์เซอร์</button>
+    <button onclick="addItem()">เพิ่มรายการอุปกรณ์</button>
+    <button onclick="downloadTemplate()">ส่งออกเทมเพลต CSV</button>
+    <button onclick="resetChecklist()" style="background:#a33">เริ่มงานใหม่ / ล้างผลตรวจ</button>
+    <div id="uploadStatus" class="upload-result" aria-live="polite"></div>
+  </div>
+
+  <div class="job-info">
+    <label>ชื่อโครงการ<input id="projectName" value="MEA 300 บ่อ" readonly></label>
+    <label>สถานที่
+      <select id="location">
+        <option value="">-- เลือกสถานที่ --</option>
+        <option>โครงการพระราม 3/1</option>
+        <option>โครงการพระราม 3/2</option>
+        <option>โครงการรัชดาพระราม9</option>
+        <option>โครงการรัชดา - อโศก</option>
+        <option>โครงการสีเขียว บางปิ้ง-บางปู</option>
+        <option>โครงการสีเขียว สุขุมวิท 81-107</option>
+        <option>โครงการสีม่วง 1 ถนนวงศ์สว่าง/ถนนนครอินทร์/ถนนติวานนท์</option>
+      </select>
+    </label>
+    <label>วันที่ออกงาน<input id="workDate" type="date"></label>
+    <div><label for="vehicleCount">ทะเบียนรถ (เลือกได้สูงสุด 3 คัน)</label>
+      <select id="vehicleCount" onchange="renderVehicleInputs();save()">
+        <option value="1">1 คัน</option><option value="2">2 คัน</option><option value="3">3 คัน</option>
+      </select>
+      <div class="vehicle-inputs" id="vehicleInputs"></div>
+    </div>
+    <label>ผู้จัดเตรียม<input id="preparedBy" value="Chunharath (Joe)"></label>
+    <label>หัวหน้าทีม<input id="teamLeader" value="Krittapad (Phone)"></label>
+  </div>
+
+  <div id="summary" style="margin:12px 0;font-weight:bold" aria-live="polite"></div>
+  <div class="table-scroll">
+  <table id="equipmentTable">
+    <colgroup><col style="width:5%"><col style="width:11%"><col style="width:32%"><col style="width:10%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:11%"><col class="remove-col" style="width:3%"></colgroup>
+    <thead>
+      <tr>
+        <th>ลำดับ</th>
+        <th>หมวด</th>
+        <th>รายการอุปกรณ์</th>
+        <th>จำนวนตามรายการ</th>
+        <th>หน่วย</th>
+        <th>ขึ้นรถ</th>
+        <th>เก็บกลับ</th>
+        <th>ผลต่าง (เก็บกลับ − ขึ้นรถ)</th>
+        <th>หมายเหตุ</th>
+        <th class="remove-col">จัดการ</th>
+      </tr>
+    </thead>
+
+    <tbody id="checklistBody"></tbody>
+  </table>
+  </div>
+  <p style="font-size:12px;color:#555">ผลต่าง = จำนวนเก็บกลับ − จำนวนขึ้นรถ | ค่าติดลบแสดงว่า “ขาด” | เท่ากับ 0 แสดงว่า “ครบ” | ค่าบวกแสดงว่า “เกิน”</p>
+
+<script>
+  const STORAGE_KEY = 'infra_plus_checklist_embedded_v3';
+  const PREVIOUS_KEY = 'infra_plus_checklist_embedded_v2';
+  const VEHICLE_OPTIONS = ['revo 2ฒย 6996', 'FJ ภ-4019', 'vigo 1ขถ-7904', '4ฒช-3722'];
+  const OLD_KEY = 'infra_plus_checklist_embedded_v1';
+  // URL deployment Google Apps Script: ใส่ที่นี่เมื่อ deploy เสร็จ (URL ไม่ใช่ความลับ)
+  // Export PDF is local only; no Google Drive upload.
+  const defaultEquipment = [{"no": 1, "category": "เครื่องมือสำรวจ", "item": "ImpulseRadar CrossOver (400/800 MHz)", "planned": 1, "unit": "เครื่อง"}, {"no": 2, "category": "เครื่องมือสำรวจ", "item": "Tablet Galaxy Tab Active", "planned": 1, "unit": "เครื่อง"}, {"no": 3, "category": "อุปกรณ์ทั่วไป", "item": "ขาจับยึดเครื่อง CrossOver", "planned": 3, "unit": "ชิ้น"}, {"no": 4, "category": "อุปกรณ์ทั่วไป", "item": "แบตเตอรี่เครื่อง CrossOver", "planned": 2, "unit": "ก้อน"}, {"no": 5, "category": "อุปกรณ์ทั่วไป", "item": "เหล็กตั้งชุดรับสัญญาณ GNSS CHC รุ่น iBASE", "planned": 2, "unit": "ท่อน"}, {"no": 6, "category": "เครื่องมือสำรวจ", "item": "ชุดรับสัญญาณ GNSS CHC รุ่น iBASE", "planned": 1, "unit": "ชุด"}, {"no": 7, "category": "เครื่องมือสำรวจ", "item": "ชุดรับสัญญาณ GNSS CHC รุ่น i73+", "planned": 1, "unit": "ชุด"}, {"no": 8, "category": "เครื่องมือสำรวจ", "item": "GPS Pole / เสารังวัดดาวเทียม", "planned": 1, "unit": "อัน"}, {"no": 9, "category": "เครื่องมือสำรวจ", "item": "วิทยุสื่อสาร", "planned": 3, "unit": "เครื่อง"}, {"no": 10, "category": "อุปกรณ์จราจร", "item": "กรวยยางจราจร", "planned": 60, "unit": "อัน"}, {"no": 11, "category": "อุปกรณ์จราจร", "item": "ไฟสัญญาณเตือนติดกรวย", "planned": 30, "unit": "อัน"}, {"no": 12, "category": "อุปกรณ์จราจร", "item": "รถเข็นไฟกระพริบฉุกเฉิน", "planned": 3, "unit": "คัน"}, {"no": 13, "category": "อุปกรณ์จราจร", "item": "กระบองไฟ LED", "planned": 5, "unit": "อัน"}, {"no": 14, "category": "อุปกรณ์จราจร", "item": "ไม้กั้นกรวยจราจร", "planned": 20, "unit": "อัน"}, {"no": 15, "category": "อุปกรณ์จราจร", "item": "โซ่คล้องกรวยจราจร", "planned": 40, "unit": "เส้น"}, {"no": 16, "category": "อุปกรณ์จราจร", "item": "ป้ายลูกศรไฟ LED", "planned": 2, "unit": "ป้าย"}, {"no": 17, "category": "อุปกรณ์ทั่วไป", "item": "ป้ายปิดทางก่อสร้าง", "planned": 1, "unit": "ชุด"}, {"no": 18, "category": "อุปกรณ์ทั่วไป", "item": "กล้อง CCTV", "planned": 1, "unit": "ตัว"}, {"no": 19, "category": "อุปกรณ์ทั่วไป", "item": "ขาตั้งกล้อง CCTV", "planned": 1, "unit": "ขา"}, {"no": 20, "category": "อุปกรณ์ทั่วไป", "item": "Powerbox / Inverter Generator", "planned": 2, "unit": "เครื่อง"}, {"no": 21, "category": "อุปกรณ์ทั่วไป", "item": "ปลั๊กพ่วงและสายไฟ", "planned": 2, "unit": "ชุด"}, {"no": 22, "category": "อุปกรณ์ทั่วไป", "item": "Sport light", "planned": 2, "unit": "ชุด"}, {"no": 23, "category": "อุปกรณ์ทั่วไป", "item": "สีสเปรย์", "planned": 6, "unit": "ชิ้น"}, {"no": 24, "category": "อุปกรณ์ทั่วไป", "item": "ชอล์ก", "planned": 1, "unit": "กล่อง"}, {"no":25,"category":"อุปกรณ์ทั่วไป","item":"ล้อวัดระยะ (50 เมตร)","planned":1,"unit":"อัน"}, {"no":26,"category":"อุปกรณ์จราจร","item":"Barrier พลาสติกใส่น้ำ","planned":2,"unit":"อัน"}];
+  const fields = ['projectName','location','workDate','vehicleCount','preparedBy','teamLeader'];
+  let vehicles = ['', '', ''];
+  let equipment = defaultEquipment.map(x => ({...x}));
+  let counts = {};
+
+  function escapeHtml(value) {
+    return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;')
+      .replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+  }
+  function todayLocal() {
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    return new Date(now.getTime()-offset).toISOString().slice(0,10);
+  }
+  function loadSaved() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(PREVIOUS_KEY) || localStorage.getItem(OLD_KEY) || 'null');
+      if(saved && Array.isArray(saved.equipment)) {
+        equipment = saved.equipment;
+        for(const extra of defaultEquipment.slice(24)) if(!equipment.some(x=>x.item===extra.item)) equipment.push({...extra});
+      }
+      if(saved?.vehicles) vehicles = saved.vehicles.slice(0,3);
+      else if(saved?.job?.vehicle) vehicles[0] = saved.job.vehicle;
+      if(saved && saved.counts && typeof saved.counts === 'object') counts = saved.counts;
+      for(const f of fields) { const defaults={projectName:'MEA 300 บ่อ', preparedBy:'Chunharath (Joe)',teamLeader:'Krittapad (Phone)',vehicleCount:'1',workDate:todayLocal()}; document.getElementById(f).value = saved?.job?.[f] ?? defaults[f] ?? ''; }
+      document.getElementById('projectName').value='MEA 300 บ่อ';
+    } catch(err) {
+      document.getElementById('workDate').value=todayLocal();
+    }
+  }
+  function save() {
+    try {
+      const job = Object.fromEntries(fields.map(f=>[f,document.getElementById(f).value]));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({equipment,counts,job,vehicles}));
+    } catch(err) { console.warn('ไม่สามารถบันทึกข้อมูลภายในเบราว์เซอร์', err); }
+  }
+  function renderTable() {
+    const body = document.getElementById('checklistBody');
+    body.innerHTML='';
+    equipment.forEach((item,index)=>{
+      const c = counts[index] || {};
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="number">${index+1}</td>
+        <td>${escapeHtml(item.category)}</td>
+        <td><span class="item-name" title="${escapeHtml(item.item)}">${escapeHtml(item.item)}</span></td>
+        <td class="number">${item.planned}</td>
+        <td class="number">${escapeHtml(item.unit)}</td>
+        <td class="number"><input type="number" min="0" step="1" id="out-${index}" value="${escapeHtml(c.out ?? '')}" oninput="calculate(${index})"></td>
+        <td class="number"><input type="number" min="0" step="1" id="return-${index}" value="${escapeHtml(c.back ?? '')}" oninput="calculate(${index})"></td>
+        <td class="number" id="diff-${index}"></td>
+        <td><input class="note" type="text" id="note-${index}" value="${escapeHtml(c.note ?? '')}" oninput="updateNote(${index})"></td>
+        <td class="remove-col"><button class="item-actions" onclick="removeItem(${index})" title="ลบรายการนี้">ลบ</button></td>`;
+      body.appendChild(tr);
+      showStatus(index);
+    });
+    updateSummary();
+  }
+  function validQuantity(input) {
+    if(input.value === '') return null;
+    const n = Number(input.value);
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  }
+  function showStatus(index) {
+    const c=counts[index]||{};
+    const diff=document.getElementById(`diff-${index}`);
+    const out=(c.out===''||c.out===undefined)?null:Number(c.out);
+    const back=(c.back===''||c.back===undefined)?null:Number(c.back);
+    diff.className='number';
+    diff.textContent='—';
+    if(out===null || back===null || !Number.isInteger(out) || !Number.isInteger(back) || out<0 || back<0) return;
+    const delta=back-out;
+    diff.textContent=delta<0?`ขาด ${Math.abs(delta)}`:(delta>0?`เกิน ${delta}`:'ครบ');
+    if(delta===0) diff.classList.add('complete');
+    else diff.classList.add('problem');
+  }
+  function calculate(index) {
+    const out=document.getElementById(`out-${index}`), back=document.getElementById(`return-${index}`);
+    const a=validQuantity(out), b=validQuantity(back);
+    if((out.value!==''&&a===null)||(back.value!==''&&b===null)){
+      alert('กรุณากรอกจำนวนเต็มตั้งแต่ 0 ขึ้นไป');
+      if(out.value!==''&&a===null) out.value='';
+      if(back.value!==''&&b===null) back.value='';
+    }
+    counts[index]={...(counts[index]||{}),out:out.value,back:back.value};
+    showStatus(index);updateSummary();save();
+  }
+  function updateNote(index) {counts[index]={...(counts[index]||{}),note:document.getElementById(`note-${index}`).value};save();}
+  function updateSummary() {
+    let complete=0,issue=0,pending=0;
+    equipment.forEach((item,i)=>{
+      const c=counts[i]||{};
+      const a=(c.out===''||c.out===undefined)?null:Number(c.out);
+      const b=(c.back===''||c.back===undefined)?null:Number(c.back);
+      if(a===null || b===null) {pending++;if(a!==null&&a!==item.planned) issue++;}
+      else if(a===item.planned&&b===a) complete++;
+      else issue++;
+    });
+    document.getElementById('summary').textContent=`รายการทั้งหมด ${equipment.length} | ตรวจครบ ${complete} | รอการตรวจ ${pending} | รายการมีปัญหา ${issue}`;
+  }
+  function addItem() {
+    const item=prompt('ชื่ออุปกรณ์ใหม่:'); if(!item?.trim())return;
+    const category=prompt('หมวดอุปกรณ์:','อุปกรณ์ทั่วไป');if(category===null)return;
+    const val=prompt('จำนวนตามรายการ (จำนวนเต็มตั้งแต่ 0 ขึ้นไป):','1');if(val===null)return;
+    const planned=Number(val);if(!Number.isInteger(planned)||planned<0||val.trim()===''){alert('จำนวนไม่ถูกต้อง');return;}
+    const unit=prompt('หน่วยนับ:','อัน');if(unit===null)return;
+    equipment.push({no:equipment.length+1,category:category.trim(),item:item.trim(),planned,unit:unit.trim()});
+    renderTable();save();
+  }
+  function removeItem(index) {
+    if(!confirm(`ลบรายการ ${equipment[index].item} ?`))return;
+    equipment.splice(index,1);
+    const updated={};Object.entries(counts).forEach(([k,v])=>{const n=Number(k);if(n<index)updated[n]=v;else if(n>index)updated[n-1]=v;});counts=updated;
+    renderTable();save();
+  }
+  function resetChecklist() {
+    if(!confirm('เริ่มงานใหม่? จะล้างข้อมูลโครงการและผลตรวจทั้งหมด (รายการอุปกรณ์ยังอยู่) โปรดบันทึก PDF ก่อน'))return;
+    counts={};
+    for(const f of fields) {const v={projectName:'MEA 300 บ่อ',workDate:todayLocal(),vehicleCount:'1',preparedBy:'Chunharath (Joe)',teamLeader:'Krittapad (Phone)'};document.getElementById(f).value=v[f]||'';}
+    vehicles=['','',''];renderVehicleInputs();
+    renderTable();save();
+  }
+  function downloadTemplate() {
+    const rows=[['ลำดับ','หมวด','รายการอุปกรณ์','จำนวนตามรายการ','หน่วย'],...equipment.map((x,i)=>[i+1,x.category,x.item,x.planned,x.unit])];
+    const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\r\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='checklist_template.csv';a.click();URL.revokeObjectURL(url);
+  }
+  function renderVehicleInputs() {
+    const count=Number(document.getElementById('vehicleCount').value);
+    const target=document.getElementById('vehicleInputs');target.innerHTML='';
+    for(let i=0;i<count;i++){
+      const wrap=document.createElement('label');
+      wrap.textContent=`คันที่ ${i+1}`;
+      wrap.style.cssText='flex:1 1 160px;font-size:12px';
+      const select=document.createElement('select');
+      select.setAttribute('aria-label',`ทะเบียนรถคันที่ ${i+1}`);
+      const blank=document.createElement('option');blank.value='';blank.textContent='-- เลือกทะเบียนรถ --';select.appendChild(blank);
+      VEHICLE_OPTIONS.forEach(v=>{const opt=document.createElement('option');opt.value=v;opt.textContent=v;select.appendChild(opt);});
+      select.value=vehicles[i]||'';
+      select.addEventListener('change',()=>{vehicles[i]=select.value;save();});
+      wrap.appendChild(select);target.appendChild(wrap);
+    }
+  }
+  function pdfFilename() {
+    const loc=document.getElementById('location').value.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_');
+    return `Checklist_${document.getElementById('workDate').value}_${loc||'ไม่ระบุสถานที่'}.pdf`;
+  }
+  function printViewClone() {
+    const frame=document.createElement('div');frame.className='pdf-render';
+    frame.innerHTML=`<h1 class="report-title">แบบฟอร์มตรวจสอบอุปกรณ์ออกหน้างาน (ขาไป–ขากลับ)</h1>`;
+    const job=document.querySelector('.job-info').cloneNode(true);
+    const vals=Object.fromEntries(fields.map(id=>[id,document.getElementById(id).value]));
+    job.querySelectorAll('input,select').forEach(el=>{
+      let val=vals[el.id]||'';
+      if(el.id==='vehicleCount') val=vehicles.slice(0,Number(vals.vehicleCount)).filter(Boolean).join(' / ')||'-';
+      const span=document.createElement('div');span.style.cssText='padding:5px 0;font-weight:bold;overflow-wrap:anywhere';span.textContent=val||'-';el.replaceWith(span);
+    });
+    const v=job.querySelector('#vehicleInputs');if(v)v.remove();
+    frame.appendChild(job);
+    const summary=document.getElementById('summary').cloneNode(true);frame.appendChild(summary);
+    const table=document.getElementById('equipmentTable').cloneNode(true);
+    table.querySelectorAll('.remove-col').forEach(el=>el.remove());
+    table.querySelectorAll('input').forEach(el=>{const span=document.createElement('span');span.textContent=el.value||'-';el.replaceWith(span);});
+    frame.appendChild(table);
+    const footer=document.createElement('p');footer.style.cssText='margin-top:18px;font-size:14px';footer.textContent='ผู้ตรวจนับ: __________________________     หัวหน้าทีม: __________________________';frame.appendChild(footer);
+    document.body.appendChild(frame);return frame;
+  }
+  function downloadBlob(blob, filename){
+    const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=filename;
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),15000);
+  }
+  async function exportPdf() {
+    const btn=document.getElementById('exportBtn');btn.disabled=true;
+    const status=document.getElementById('uploadStatus');status.textContent='กำลังสร้าง PDF...';
+    let frame;
+    try {
+      if(!window.html2canvas||!window.jspdf){status.textContent='เลือก Save as PDF ในหน้าต่างพิมพ์';window.print();return;}
+      frame=printViewClone();
+      const canvas=await html2canvas(frame,{scale:1.5,backgroundColor:'#fff',useCORS:true,logging:false});
+      frame.remove();frame=null;
+      const pdf=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+      const margin=8, pageW=297, pageH=210,drawW=pageW-2*margin,drawH=pageH-2*margin;
+      const pixPerMm=canvas.width/drawW;
+      const sliceHeight=Math.floor(drawH*pixPerMm);
+      for(let top=0,n=0;top<canvas.height;top+=sliceHeight,n++){
+        if(n)pdf.addPage();
+        const h=Math.min(sliceHeight,canvas.height-top);
+        const part=document.createElement('canvas');part.width=canvas.width;part.height=h;
+        part.getContext('2d').drawImage(canvas,0,top,canvas.width,h,0,0,canvas.width,h);
+        pdf.addImage(part.toDataURL('image/jpeg',0.9),'JPEG',margin,margin,drawW,h/pixPerMm);
+      }
+      const filename=pdfFilename();const blob=pdf.output('blob');downloadBlob(blob,filename);status.textContent="ดาวน์โหลด PDF แล้ว";
+    }catch(e){console.error(e);status.textContent='ไม่สามารถสร้างไฟล์โดยตรงได้ กรุณาเลือก Save as PDF ในหน้าต่างพิมพ์';if(frame){frame.remove();frame=null;}window.print();}
+    finally{if(frame)frame.remove();btn.disabled=false;}
+  }
+  fields.forEach(f=>document.getElementById(f).addEventListener('input',save));
+  loadSaved();renderVehicleInputs();renderTable();
+</script>
+
+</body>
+</html>
